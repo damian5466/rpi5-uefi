@@ -3,6 +3,9 @@ This fork contains a TF-A + EDK2 UEFI firmware port for Raspberry Pi 5, includin
 BCM2712 D0 display/GPIO compatibility, ACPI peripheral descriptions, SD voltage
 switching, RP1 handoff, fan control, and file-backed NVRAM.
 
+Native driver authors should read the [ACPI driver contract](edk2-platforms/Platform/RaspberryPi/RPi5/ACPI-CONTRACT.md)
+for resource ownership, the boot device connection graph, and shared-service interfaces.
+
 ![EDK2 Setup Screen](images/edk2_setup_screen.png)
 
 # Getting started
