@@ -1,14 +1,7 @@
-# End of support notice
-This repository is no longer maintained and has been archived.
-
-The firmware provided here has only been tested on early Raspberry Pi 5B models with the BCM2712C1 SoC. Recent D0 models may require a newer EEPROM firmware, which has been reported to break the graphical output in UEFI and other projects. Given that it used to work before, we view this as a limitation of the latest EEPROM firmware rather than a UEFI issue.
-
-If you are still interested in running UEFI on these boards, please contact Raspberry Pi for further support.
-
-You may also want to consider using better supported hardware instead: https://github.com/edk2-porting/edk2-rk3588
-
 # Raspberry Pi 5 UEFI
-This repository contains a TF-A + EDK2 UEFI firmware port for Raspberry Pi 5.
+This fork contains a TF-A + EDK2 UEFI firmware port for Raspberry Pi 5, including
+BCM2712 D0 display/GPIO compatibility, ACPI peripheral descriptions, SD voltage
+switching, RP1 handoff, fan control, and file-backed NVRAM.
 
 ![EDK2 Setup Screen](images/edk2_setup_screen.png)
 
@@ -33,7 +26,7 @@ Check the [Supported OSes](#supported-oses) and [Supported peripherals in UEFI](
 Optionally, if display is not available or for debugging purposes, an UART serial adapter compatible with the special connector. Configuration is `115200 8n1`.
 
 ## 2. Download the firmware image
-The latest version can be obtained from [Releases](https://github.com/worproject/rpi5-uefi/releases).
+The latest version can be obtained from [Releases](https://github.com/damian5466/rpi5-uefi/releases).
 
 ## 3. Flash the firmware
 Prepare an empty boot drive by formatting the first partition as FAT32, then extract the archive downloaded above to the root of this partition.
@@ -69,6 +62,9 @@ The PCIe connector is limited to Gen 2 speed by default. For other modes, go to 
 
 * If you're running the RPi downstream kernel, enabling Device Tree instead of ACPI will provide better hardware support. To do so, go to `Device Manager`->`Raspberry Pi Configuration`->`ACPI / Device Tree` and change `System Table Mode`.
 
+> [!NOTE]
+> Windows support was tested with drivers from [rpi5-windows-drivers](https://github.com/damian5466/rpi5-windows-drivers).
+
 # Status
 
 ## Supported OSes
@@ -77,11 +73,7 @@ ACPI support is currently under development and limited to a few devices that ha
 
 | OS | Version | Tested/supported hardware | Notes |
 | --- | --- | --- | --- |
-| Windows | 11 (including insider) | Display, USB, SD, SDIO, PCIe | * SD is limited to DDR50.<br> * PL011 UART driver fails to start, but debugging over it still works via DBG2.<br> * PCIe is limited to single-function devices. |
-| Linux | tested Ubuntu 22.04, kernel 5.15.0-75-generic | Display, UART, USB, SD, SDIO (incl. Wi-Fi), PCIe | * SD is limited to HS by default.<br> * Wi-Fi may require manual firmware installation.<br> * PCIe is limited to single-function devices; needs to be enabled manually.<br> See [Configuration settings - Linux](#Linux). |
-| FreeBSD | 13.2 | Display, UART, USB, SD, PCIe | * SD is limited to HS. |
-| NetBSD | recent daily build | Display, UART, USB, PCIe | * SD fails to communicate with the card. |
-| VMware ESXi Arm Fling | 1.15 | Display, UART, USB, PCIe | * Requires compatible USB network adapter. |
+| Windows | 11 (26100.9539) | Display, USB, SD, SDIO, PCIe, Ethernet, PWM | * SD is limited to DDR50.<br> * PL011 UART driver fails to start, but debugging over it still works via DBG2.<br> * PCIe is limited to single-function devices. |
 
 ### In Device Tree mode
 The included DTB is meant for the RPi downstream 6.1.y kernel.
@@ -95,7 +87,7 @@ The included DTB is meant for the RPi downstream 6.1.y kernel.
 | RP1 USB                            | 🟢 Working     | |
 | RP1 Ethernet                       | 🔴 Not working | |
 | RP1 GPIO                           | 🔴 Not working | |
-| RP1 PWM                            | 🔴 Not working | Fan control |
+| RP1 PWM                            | 🟢 Working     | Cooling fan control and OS handoff. |
 | PCIe                               | 🟢 Working     | |
 | SD                                 | 🟢 Working     | SD cards up to SDR104. eMMC support is unknown. |
 | Display                            | 🟢 Working     | HDMI, driven by the VPU firmware. |
@@ -103,7 +95,7 @@ The included DTB is meant for the RPi downstream 6.1.y kernel.
 | GPIO                               | 🟢 Working     | GIO/AON, pin function. |
 | RTC                                | 🟢 Working     | Get/set time, wake up alarm. |
 | RNG                                | 🟢 Working     | |
-| EEPROM                             | 🔴 Not working | Needed for proper NVRAM. |
+| EEPROM                             | 🔴 Not working | Optional file-backed variable persistence is available. |
 
 ## Building
 This process assumes a Linux machine. On Windows, use WSL.
@@ -122,7 +114,7 @@ This process assumes a Linux machine. On Windows, use WSL.
 
 2. Clone the repository:
    ```bash
-   git clone --recurse-submodules https://github.com/worproject/rpi5-uefi.git
+   git clone --recurse-submodules https://github.com/damian5466/rpi5-uefi.git
    cd rpi5-uefi
    ```
 
@@ -133,6 +125,21 @@ This process assumes a Linux machine. On Windows, use WSL.
    Append `--help` for more details.
 
 If you get build errors, it is very likely that you're still missing some dependencies. The list of packages above is not complete and depending on the distro you may need to install additional ones. In most cases, looking up the error messages on the internet will point you at the right packages.
+
+### Boot files
+
+Assemble the firmware image, configuration, and pinned boot support files:
+
+```bash
+mkdir -p Build/boot/release
+cp RPI_EFI.fd config.txt Build/boot/release/
+cd Build/boot/release
+mkdir -p overlays
+curl -fL https://raw.githubusercontent.com/raspberrypi/firmware/1e403e23baab5673f0494a200f57cd01287d5b1a/boot/bcm2712-rpi-5-b.dtb -o bcm2712-rpi-5-b.dtb
+curl -fL https://raw.githubusercontent.com/raspberrypi/firmware/bead686816848038563a542dc854346ab13253a2/boot/overlays/bcm2712d0.dtbo -o overlays/bcm2712d0.dtbo
+echo "c5432acc8373fa6311e147221b8ba5c8685b957730afac7592c5deac2b27e732  bcm2712-rpi-5-b.dtb" | sha256sum -c -
+echo "b73210c9256ff4b4963365f9acc49c0f7449f17eeddf21355e23dd011da899ec  overlays/bcm2712d0.dtbo" | sha256sum -c -
+```
 
 ## Licenses
 Most files are licensed under the default EDK2 license, [BSD-2-Clause-Patent](https://github.com/tianocore/edk2/blob/master/License.txt).

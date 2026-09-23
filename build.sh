@@ -82,7 +82,7 @@ popd || exit
 #
 # Build EDK2 final image
 #
-GIT_COMMIT="$(git describe --tags --always)" || GIT_COMMIT="unknown"
+GIT_COMMIT="$(git describe --tags --always --dirty)" || GIT_COMMIT="unknown"
 
 if [ ${DEBUG} == 1 ]; then
     RELEASE_TYPE="DEBUG"

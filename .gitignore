@@ -6,3 +6,6 @@ __pycache__/
 tags/
 .vscode/
 *.fd
+
+# Firmware variable stores
+RPI_NV?.bin
